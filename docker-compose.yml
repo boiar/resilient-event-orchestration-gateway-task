@@ -1,0 +1,122 @@
+version: '3.9'
+
+services:
+
+  # nest
+  app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: fincart_app
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      RABBITMQ_URL: amqp://fincart:fincart_pass@rabbitmq:5672
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MONGODB_URI: mongodb://mongodb:27017/fincart_events
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - fincart_network
+    healthcheck:
+      test: [ 'CMD', 'curl', '-f', 'http://localhost:3000/health' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # rabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: fincart_rabbitmq
+    restart: unless-stopped
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: fincart
+      RABBITMQ_DEFAULT_PASS: fincart_pass
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      - fincart_network
+    healthcheck:
+      test: [ 'CMD', 'rabbitmq-diagnostics', 'ping' ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: fincart_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --requirepass redis_pass
+    volumes:
+      - redis_data:/data
+    networks:
+      - fincart_network
+    healthcheck:
+      test: [ 'CMD', 'redis-cli', '-a', 'redis_pass', 'ping' ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+
+  # mongo
+  mongodb:
+    image: mongo:7-jammy
+    container_name: fincart_mongodb
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: fincart
+      MONGO_INITDB_ROOT_PASSWORD: mongo_pass
+      MONGO_INITDB_DATABASE: fincart_events
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - fincart_network
+    healthcheck:
+      test: [ 'CMD', 'mongosh', '--eval', "db.adminCommand('ping')" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+
+networks:
+  fincart_network:
+    driver: bridge
+    name: fincart_network
