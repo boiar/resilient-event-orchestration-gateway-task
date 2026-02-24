@@ -11,6 +11,9 @@ services:
     restart: unless-stopped
     ports:
       - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
     env_file:
       - .env
     environment:
@@ -20,6 +23,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       MONGODB_URI: mongodb://mongodb:27017/fincart_events
+    command: npm run start:dev
     depends_on:
       rabbitmq:
         condition: service_healthy
