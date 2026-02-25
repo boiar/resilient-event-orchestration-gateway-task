@@ -1,1 +1,2 @@
 export const EVENT_REPOSITORY = 'IEventRepository';
+export const EVENTS_GATEWAY_SERVICE = 'EVENTS_GATEWAY_SERVICE';

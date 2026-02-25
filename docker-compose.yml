@@ -54,8 +54,8 @@ services:
       RABBITMQ_DEFAULT_VHOST: /
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./docker-config/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./docker-config/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
     networks:
       - fincart_network
     healthcheck:

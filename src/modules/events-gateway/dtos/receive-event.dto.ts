@@ -9,7 +9,7 @@ export class ReceiveEventDto {
         example: 'event_abc12'
     })
     @IsString()
-    eventId: string
+    eventId: string;
 
     @ApiProperty({
         description: 'shipment ID',

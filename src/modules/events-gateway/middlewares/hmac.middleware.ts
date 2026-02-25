@@ -1,5 +1,5 @@
 import {Injectable, NestMiddleware, UnauthorizedException} from "@nestjs/common";
-import * as crypto  from "crypto";
+import * as crypto from "crypto";
 
 @Injectable()
 export class HmacMiddleware implements NestMiddleware {

@@ -1,5 +1,5 @@
 import {Body, Controller, Get, Post} from '@nestjs/common';
-import {EventsGatewayService} from "../../../services/events-gateway.service";
+import {EventsGatewayService} from "../../../services/implemention/events-gateway.service";
 import {ReceiveEventDto} from "../../../dtos/receive-event.dto";
 import {ApiOperation, ApiResponse} from "@nestjs/swagger";
 
@@ -9,14 +9,15 @@ import {ApiOperation, ApiResponse} from "@nestjs/swagger";
 })
 export class EventsGatewayController {
 
-    constructor(private readonly eventGatewayService: EventsGatewayService) {}
+    constructor(private readonly eventGatewayService: EventsGatewayService) {
+    }
 
 
     @Post()
-    @ApiOperation({ summary: 'Ingest a new event' })
-    @ApiResponse({ status: 202, description: 'Event accepted' })
-    @ApiResponse({ status: 409, description: 'Duplicate event' })
-    async ReceiveEvent(@Body() dto: ReceiveEventDto){
+    @ApiOperation({summary: 'Ingest a new event'})
+    @ApiResponse({status: 202, description: 'Event accepted'})
+    @ApiResponse({status: 409, description: 'Duplicate event'})
+    async ReceiveEvent(@Body() dto: ReceiveEventDto) {
         return await this.eventGatewayService.eventsEnqueue(dto)
     }
 

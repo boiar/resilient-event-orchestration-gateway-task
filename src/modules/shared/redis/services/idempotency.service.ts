@@ -1,5 +1,5 @@
 import {Inject, Injectable} from '@nestjs/common';
-import {ReceiveEventDto} from "../../../modules/events-gateway/dtos/receive-event.dto";
+import {ReceiveEventDto} from "../../../events-gateway/dtos/receive-event.dto";
 import Redis from "ioredis";
 
 @Injectable()
