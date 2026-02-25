@@ -11,7 +11,7 @@ export class EventRepositoryMongo implements IEventRepository {
     constructor(@InjectModel(EventEntity.name) private readonly model: Model<EventDocument>) {
     }
 
-    async findByEventId(eventId: string): Promise<EventEntity> {
+    async findByEventId(eventId: string): Promise<EventEntity | null> {
         return this.model.findOne({eventId}).exec();
     }
 

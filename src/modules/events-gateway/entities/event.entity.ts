@@ -8,19 +8,19 @@ export type EventDocument = EventEntity & Document;
 @Schema({collection: 'events', timestamps: {createdAt: 'createdAt', updatedAt: 'processedAt'}})
 export class EventEntity {
     @Prop({required: true, unique: true})
-    eventId: string;
+    eventId!: string;
 
     @Prop({required: true})
-    shipmentId: string;
+    shipmentId!: string;
 
     @Prop({type: Object, default: {}}) // as json
-    payload: any;
+    payload!: any;
 
     @Prop({required: true, enum: EventTypeEnum})
-    type: EventTypeEnum;
+    type!: EventTypeEnum;
 
     @Prop({enum: EventStatusEnum, default: EventStatusEnum.PENDING})
-    status: EventStatusEnum
+    status!: EventStatusEnum
 }
 
 export const EventSchema = SchemaFactory.createForClass(EventEntity);

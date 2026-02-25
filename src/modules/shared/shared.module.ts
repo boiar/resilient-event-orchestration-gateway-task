@@ -1,10 +1,10 @@
-import { Module, Global } from '@nestjs/common';
-import { RedisProvider } from './redis/providers/redis.provider';
-import { IdempotencyService } from './redis/services/idempotency.service';
+import {Module, Global} from '@nestjs/common';
+import {RedisModule} from "./redis/redis.module";
 
-@Global() // so any module can use it without importing
+@Global()
 @Module({
-    providers: [RedisProvider, IdempotencyService],
-    exports: [RedisProvider, IdempotencyService],
+    imports: [RedisModule],
+    exports: [RedisModule],
 })
-export class SharedModule {}
+export class SharedModule {
+}

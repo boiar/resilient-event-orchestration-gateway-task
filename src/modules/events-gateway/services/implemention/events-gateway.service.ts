@@ -1,6 +1,6 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {ReceiveEventDto} from "../../dtos/receive-event.dto";
-import {IdempotencyService} from "../../../shared/redis/services/idempotency.service";
+import {IdempotencyService} from "../../../shared/redis/services/implemetion/idempotency.service";
 import {InjectQueue} from "@nestjs/bull";
 import {Queue} from "bull";
 import {EventMapper} from "../../mappers/event.mapper";

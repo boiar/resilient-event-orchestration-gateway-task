@@ -1,9 +1,10 @@
 import {Inject, Injectable} from '@nestjs/common';
-import {ReceiveEventDto} from "../../../events-gateway/dtos/receive-event.dto";
+import {ReceiveEventDto} from "../../../../events-gateway/dtos/receive-event.dto";
 import Redis from "ioredis";
+import {IIdempotencyService} from "../idempotency-service.interface";
 
 @Injectable()
-export class IdempotencyService {
+export class IdempotencyService  implements IIdempotencyService{
     constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
 
     async acquireLock(eventId: string): Promise<boolean> {
