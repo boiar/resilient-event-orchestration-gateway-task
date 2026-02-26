@@ -19,5 +19,8 @@
     "noFallthroughCasesInSwitch": false,
     "strict": true
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*",
+    "src/modules/events-gateway/test/load/**/*"
+  ]
 }

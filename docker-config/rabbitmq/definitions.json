@@ -1,5 +1,21 @@
 {
+  "users": [
+    {
+      "name": "fincart",
+      "password": "fincart_pass",
+      "tags": "administrator"
+    }
+  ],
   "vhosts": [{ "name": "/" }],
+  "permissions": [
+    {
+      "user": "fincart",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
   "exchanges": [
     {
       "name": "events.direct",

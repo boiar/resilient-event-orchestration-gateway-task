@@ -1,15 +1,17 @@
-import {Processor, Process} from "@nestjs/bull";
-import {Job} from "bull";
-import {ReceiveEventDto} from "../dtos/receive-event.dto";
-import {EventsGatewayService} from "../services/implemention/events-gateway.service";
+import { Controller, Logger } from '@nestjs/common';
+import { MessagePattern, Payload, EventPattern } from '@nestjs/microservices';
+import { ReceiveEventDto } from '../dtos/receive-event.dto';
+import { EventsGatewayService } from '../services/implemention/events-gateway.service';
 
-@Processor('events')
+@Controller()
 export class EventsProcessor {
-    constructor(private readonly eventsGatewayService: EventsGatewayService) {
-    }
+    private readonly logger = new Logger(EventsProcessor.name);
 
-    @Process('process-event')
-    async handleEvent(job: Job<ReceiveEventDto>): Promise<void> {
-        await this.eventsGatewayService.processQueuedEvent(job.data);
+    constructor(private readonly eventsGatewayService: EventsGatewayService) {}
+
+    @EventPattern('process-event')
+    async handleEvent(@Payload() dto: ReceiveEventDto): Promise<void> {
+        this.logger.log(`Processing event: ${dto.eventId}`);
+        await this.eventsGatewayService.processQueuedEvent(dto);
     }
 }

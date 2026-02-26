@@ -60,11 +60,4 @@ export class ReceiveEventDto {
     @IsObject()
     payload!: Record<string, any>;
 
-    @ApiProperty({
-        description: 'HMAC signature for payload authenticity validation',
-        example: 'a9f5d1c3b2e6f7..',
-    })
-    @IsString()
-    signature!: string;
-
 }

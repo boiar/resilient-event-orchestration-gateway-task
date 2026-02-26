@@ -1,5 +1,5 @@
 export interface IIdempotencyService {
-    acquireLock(eventId: string): Promise<boolean>;
+    acquireLock(eventId: string, shipmentId: string): Promise<boolean>;
 
-    releaseLock(eventId: string): Promise<void>;
+    releaseLock(eventId: string, shipmentId: string): Promise<void>;
 }
