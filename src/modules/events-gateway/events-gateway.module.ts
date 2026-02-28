@@ -1,45 +1,58 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { EventsGatewayController } from './controllers/api/v1/events-gateway.controller';
-import { EventsGatewayService } from './services/implemention/events-gateway.service';
+import { EventsGatewayService } from './services/implementation/events-gateway.service';
 import { SharedModule } from "../shared/shared.module";
 import { HmacMiddleware } from "./middlewares/hmac.middleware";
 import { EventsProcessor } from "./processors/events-queue.processor";
-import { EVENT_REPOSITORY, EVENTS_GATEWAY_SERVICE, EVENTS_QUEUE_CLIENT } from "./constants/event.constants";
-import { EventRepositoryMongo } from "./repositories/implemention/event.repository.mongo";
+import { HttpModule } from "@nestjs/axios";
+import { BullModule } from '@nestjs/bullmq';
+import { EVENT_REPOSITORY, EVENTS_GATEWAY_SERVICE, SHIPMENT_REPOSITORY } from "./constants/event.constants";
+import { EventRepositoryMongo } from "./repositories/implementation/event.repository.mongo";
+import { ShipmentRepositoryMongo } from "./repositories/implementation/shipment.repository.mongo";
 import { MongooseModule } from "@nestjs/mongoose";
 import { EventEntity, EventSchema } from "./entities/event.entity";
-import { ClientsModule, Transport } from "@nestjs/microservices";
+import { ShipmentEntity, ShipmentSchema } from "./entities/shipment.entity";
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
     imports: [
-        ClientsModule.register([
-            {
-                name: EVENTS_QUEUE_CLIENT,
-                transport: Transport.RMQ,
-                options: {
-                    urls: [process.env.RABBITMQ_URL || 'amqp://fincart:fincart_pass@rabbitmq:5672'],
-                    queue: 'events',
-                    queueOptions: { durable: true },
-                    socketOptions: {
-                        heartbeatIntervalInSeconds: 60,
-                        reconnectTimeInSeconds: 5,
-                    },
-                    noAck: true,
-                    persistent: true,
+        BullModule.registerQueue({
+            name: 'events-processing',
+            defaultJobOptions: {
+                attempts: 3,
+                backoff: {
+                    type: 'exponential',
+                    delay: 1000,
                 },
+                removeOnComplete: true,
+                removeOnFail: false,
             },
-        ]),
-        SharedModule,
+        }),
         MongooseModule.forFeature([
-            { name: EventEntity.name, schema: EventSchema }
+            { name: EventEntity.name, schema: EventSchema },
+            { name: ShipmentEntity.name, schema: ShipmentSchema }
         ]),
+        HttpModule.registerAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                timeout: 10000,
+                baseURL: config.get<string>('app.routingServiceUrl'),
+            }),
+        }),
+        SharedModule,
     ],
-    controllers: [EventsGatewayController, EventsProcessor],
+    controllers: [EventsGatewayController],
     providers: [
         EventsGatewayService,
+        EventsProcessor,
         {
             provide: EVENT_REPOSITORY,
             useClass: EventRepositoryMongo,
+        },
+        {
+            provide: SHIPMENT_REPOSITORY,
+            useClass: ShipmentRepositoryMongo,
         },
         {
             provide: EVENTS_GATEWAY_SERVICE,

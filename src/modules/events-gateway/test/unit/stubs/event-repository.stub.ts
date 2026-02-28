@@ -7,7 +7,12 @@ export class EventRepositoryStub implements IEventRepository {
     private store: EventEntity[] = [];
 
     async save(event: EventEntity): Promise<EventEntity> {
-        this.store.push(event);
+        const index = this.store.findIndex(e => e.eventId === event.eventId);
+        if (index !== -1) {
+            this.store[index] = event;
+        } else {
+            this.store.push(event);
+        }
         return event;
     }
 
@@ -18,6 +23,10 @@ export class EventRepositoryStub implements IEventRepository {
     async updateStatus(eventId: string, eventStatus: EventStatusEnum): Promise<void> {
         const event = this.store.find(e => e.eventId === eventId);
         if (event) event.status = eventStatus;
+    }
+
+    async countByStatus(status: EventStatusEnum): Promise<number> {
+        return this.store.filter(e => e.status === status).length;
     }
 
     getStore(): EventEntity[] {

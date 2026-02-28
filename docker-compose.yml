@@ -18,7 +18,6 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - RABBITMQ_URL=amqp://fincart:fincart_pass@rabbitmq:5672
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=redis_pass
@@ -27,8 +26,6 @@ services:
 
     command: npm run start:prod
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       redis:
         condition: service_healthy
       mongodb:
@@ -40,31 +37,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
-
-  # rabbitMQ
-  rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: fincart_rabbitmq
-    restart: unless-stopped
-    ports:
-      - '5672:5672'
-      - '15672:15672'
-    environment:
-      RABBITMQ_DEFAULT_USER: fincart
-      RABBITMQ_DEFAULT_PASS: fincart_pass
-      RABBITMQ_DEFAULT_VHOST: /
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-      - ./docker-config/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ./docker-config/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
-    networks:
-      - fincart_network
-    healthcheck:
-      test: [ 'CMD', 'rabbitmq-diagnostics', 'ping' ]
-      interval: 15s
-      timeout: 10s
-      retries: 10
       start_period: 30s
 
   redis:
@@ -134,8 +106,6 @@ services:
       - fincart_network
 
 volumes:
-  rabbitmq_data:
-    driver: local
   redis_data:
     driver: local
   mongodb_data:

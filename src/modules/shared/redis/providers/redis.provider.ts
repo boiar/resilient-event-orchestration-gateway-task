@@ -1,18 +1,22 @@
 import { Provider } from '@nestjs/common';
 import Redis from 'ioredis';
+import { ConfigService } from '@nestjs/config';
 import { REDIS_CLIENT } from "../constants/redis.constants";
 
 export const RedisProvider: Provider = {
     provide: REDIS_CLIENT,
-    useFactory: () => {
+    inject: [ConfigService],
+    useFactory: (config: ConfigService) => {
+        const redisSettings = config.get('redis');
+
         const redisClient = new Redis({
-            host: process.env.REDIS_HOST || 'redis',
-            port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-            password: process.env.REDIS_PASSWORD || 'redis_pass',
+            host: redisSettings.host,
+            port: redisSettings.port,
+            password: redisSettings.password,
             enableOfflineQueue: true,  // Queue commands when disconnected (important for startup)
             maxRetriesPerRequest: 3,
             connectTimeout: 3000,
-            commandTimeout: 500,   
+            commandTimeout: 500,
             keepAlive: 10000,
             family: 4,
             lazyConnect: false,  // Connect eagerly at startup

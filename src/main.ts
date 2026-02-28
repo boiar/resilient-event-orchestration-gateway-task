@@ -1,8 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, VersioningType } from "@nestjs/common";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { GlobalExceptionFilter } from "./modules/shared/filters/global-exception.filter";
 
 async function bootstrap() {
     // Specify NestExpressApplication to get rawBody support
@@ -10,23 +10,7 @@ async function bootstrap() {
         logger: process.env.NODE_ENV === 'production'
             ? ['error', 'warn']
             : ['log', 'error', 'warn', 'debug', 'verbose'],
-        rawBody: true, // Critical for fast HMAC validation
-    });
-
-    // connect to rabbitMQ
-    app.connectMicroservice<MicroserviceOptions>({
-        transport: Transport.RMQ,
-        options: {
-            urls: [process.env.RABBITMQ_URL || 'amqp://fincart:fincart_pass@rabbitmq:5672'],
-            queue: 'events',
-            queueOptions: { durable: true },
-            noAck: false,
-            prefetchCount: parseInt(process.env.WORKER_PREFETCH ?? '10', 10),
-            socketOptions: {
-                keepAlive: true,
-                heartbeatIntervalInSeconds: 60,
-            },
-        },
+        rawBody: true,
     });
 
     // api-version
@@ -34,16 +18,15 @@ async function bootstrap() {
         type: VersioningType.URI
     });
 
-    // Disable body parsing overhead for large requests if needed, 
-    // but here we just need rawBody.
 
     app.useGlobalPipes(new ValidationPipe({
         whitelist: true,
         transform: false,
-        disableErrorMessages: true, // Small perf gain in production
+        disableErrorMessages: true,
     }));
 
-    await app.startAllMicroservices();
+    app.useGlobalFilters(new GlobalExceptionFilter());
+    app.enableShutdownHooks();
 
     await app.listen(process.env.PORT || 3000, '0.0.0.0');
     console.log(`Application is running on: ${await app.getUrl()}`);

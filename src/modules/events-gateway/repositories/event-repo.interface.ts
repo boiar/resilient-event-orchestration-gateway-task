@@ -7,4 +7,6 @@ export interface IEventRepository {
     findByEventId(eventId: string): Promise<EventEntity | null>;
 
     updateStatus(eventId: string, eventStatus: EventStatusEnum): Promise<void>;
+
+    countByStatus(status: EventStatusEnum): Promise<number>;
 }

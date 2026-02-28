@@ -1,6 +1,6 @@
-import {IsEnum, IsISO8601, IsObject, IsString} from "class-validator";
-import {ApiProperty} from "@nestjs/swagger";
-import {EventTypeEnum} from "../enums/event-type.enum";
+import { IsEnum, IsISO8601, IsObject, IsString } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+import { EventTypeEnum } from "../enums/event-type.enum";
 
 export class ReceiveEventDto {
 
@@ -38,7 +38,7 @@ export class ReceiveEventDto {
         example: 'SHIPMENT_CREATED'
     })
     @IsEnum(EventTypeEnum)
-    type!: string;
+    type!: EventTypeEnum;
 
     @ApiProperty({
         description: 'Event occurrence timestamp',

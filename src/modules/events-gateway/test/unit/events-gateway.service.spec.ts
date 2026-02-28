@@ -1,16 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { EventsGatewayService } from '../../services/implemention/events-gateway.service';
-import { IdempotencyService } from '../../../shared/redis/services/implemetion/idempotency.service';
-import { EVENT_REPOSITORY, EVENTS_QUEUE_CLIENT } from '../../constants/event.constants';
+import { EventsGatewayService } from '../../services/implementation/events-gateway.service';
+import { IdempotencyService } from '../../../shared/redis/services/implementation/idempotency.service';
+import { EVENT_REPOSITORY, SHIPMENT_REPOSITORY } from '../../constants/event.constants';
 import { EventStatusEnum } from '../../enums/event-status.enum';
 import { EventTypeEnum } from '../../enums/event-type.enum';
 import { EventEntity } from '../../entities/event.entity';
 import { ReceiveEventDto } from '../../dtos/receive-event.dto';
 import { EventRepositoryStub } from './stubs/event-repository.stub';
+import { ShipmentRepositoryStub } from './stubs/shipment-repository.stub';
 import { IdempotencyServiceStub } from '../../../shared/redis/test/unit/stubs/idempotency.service.stub';
 import { Logger } from '@nestjs/common';
-import { of, Subject } from 'rxjs';
-
+import { of, throwError } from 'rxjs';
+import { getQueueToken } from '@nestjs/bullmq';
+import { HttpService } from '@nestjs/axios';
+import { ShipmentStatusEnum } from '../../enums/shipment-status.enum';
+import { ConfigService } from '@nestjs/config';
 
 const fakeReceiveEventDto = (overrides: Partial<ReceiveEventDto> = {}): ReceiveEventDto =>
     <ReceiveEventDto>{
@@ -24,65 +28,61 @@ const fakeReceiveEventDto = (overrides: Partial<ReceiveEventDto> = {}): ReceiveE
         ...overrides,
     };
 
-
 const makeQueueStub = () => ({
-    connect: jest.fn().mockResolvedValue(undefined),
-    emit: jest.fn().mockReturnValue(of(null)),
-    close: jest.fn(),
+    add: jest.fn().mockResolvedValue({ id: 'job_123' }),
 });
 
+const makeHttpStub = () => ({
+    post: jest.fn().mockReturnValue(of({ data: { routeId: 'route_123' } })),
+});
+
+const makeConfigStub = () => ({
+    get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'app.routingServiceUrl') return '/v1/routing-service';
+        return undefined;
+    }),
+});
 
 describe('EventsGatewayService', () => {
     let service: EventsGatewayService;
     let idempotencyStub: IdempotencyServiceStub;
     let eventRepoStub: EventRepositoryStub;
+    let shipmentRepoStub: ShipmentRepositoryStub;
     let queueStub: ReturnType<typeof makeQueueStub>;
+    let httpStub: ReturnType<typeof makeHttpStub>;
+    let configStub: ReturnType<typeof makeConfigStub>;
     let loggerErrorSpy: jest.SpyInstance;
 
     beforeEach(async () => {
         idempotencyStub = new IdempotencyServiceStub();
         eventRepoStub = new EventRepositoryStub();
+        shipmentRepoStub = new ShipmentRepositoryStub();
         queueStub = makeQueueStub();
+        httpStub = makeHttpStub();
+        configStub = makeConfigStub();
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 EventsGatewayService,
                 { provide: IdempotencyService, useValue: idempotencyStub },
                 { provide: EVENT_REPOSITORY, useValue: eventRepoStub },
-                { provide: EVENTS_QUEUE_CLIENT, useValue: queueStub },
+                { provide: SHIPMENT_REPOSITORY, useValue: shipmentRepoStub },
+                { provide: getQueueToken('events-processing'), useValue: queueStub },
+                { provide: HttpService, useValue: httpStub },
+                { provide: ConfigService, useValue: configStub },
             ],
         }).compile();
 
         service = module.get<EventsGatewayService>(EventsGatewayService);
-        loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+        loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => { });
     });
 
     afterEach(() => {
         loggerErrorSpy.mockRestore();
         idempotencyStub.clear();
         eventRepoStub.clear();
+        shipmentRepoStub.clear();
     });
-
-
-    describe('onModuleInit', () => {
-        it('should connect the queue client on init', async () => {
-            await service.onModuleInit();
-            expect(queueStub.connect).toHaveBeenCalledTimes(1);
-        });
-
-        it('should log error when queue client connection fails', async () => {
-            const error = new Error('connection refused');
-            queueStub.connect.mockRejectedValueOnce(error);
-
-            await service.onModuleInit();
-
-            expect(loggerErrorSpy).toHaveBeenCalledWith(
-                'Failed to connect queue client',
-                error,
-            );
-        });
-    });
-
 
     describe('eventsEnqueue', () => {
         it('should always return accepted status', async () => {
@@ -90,139 +90,98 @@ describe('EventsGatewayService', () => {
             expect(result).toEqual({ status: 'accepted' });
         });
 
-        it('should emit the event to the queue with correct pattern and payload', async () => {
+        it('should add the event to the queue with correct job name and options', async () => {
             const dto = fakeReceiveEventDto();
 
             await service.eventsEnqueue(dto);
 
-            expect(queueStub.emit).toHaveBeenCalledTimes(1);
-            expect(queueStub.emit).toHaveBeenCalledWith('process-event', dto);
+            expect(queueStub.add).toHaveBeenCalledTimes(1);
+            expect(queueStub.add).toHaveBeenCalledWith('process-event', dto, {
+                jobId: dto.eventId,
+            });
         });
 
-        it('should return accepted even when queue emit errors', async () => {
-            // emit returns an observable that errors — catchError in service swallows it
-            queueStub.emit.mockReturnValueOnce(
-                new Subject(), // never emits, timeout will trigger
-            );
+        it('should throw error when queue add fails', async () => {
+            queueStub.add.mockRejectedValueOnce(new Error('queue error'));
 
-            const result = await service.eventsEnqueue(fakeReceiveEventDto());
-
-            expect(result).toEqual({ status: 'accepted' });
-        });
-
-        it('should not interact with idempotency on enqueue', async () => {
-            const acquireSpy = jest.spyOn(idempotencyStub, 'acquireLock');
-
-            await service.eventsEnqueue(fakeReceiveEventDto());
-
-            expect(acquireSpy).not.toHaveBeenCalled();
-        });
-
-        it('should not save to repository on enqueue', async () => {
-            await service.eventsEnqueue(fakeReceiveEventDto());
-            expect(eventRepoStub.getStore()).toHaveLength(0);
+            await expect(service.eventsEnqueue(fakeReceiveEventDto())).rejects.toThrow('queue error');
         });
     });
 
-
     describe('processQueuedEvent', () => {
+        it('should skip if event already PROCESSED in DB', async () => {
+            const dto = fakeReceiveEventDto();
+            await eventRepoStub.save({ eventId: dto.eventId, status: EventStatusEnum.PROCESSED } as EventEntity);
+            const acquireSpy = jest.spyOn(idempotencyStub, 'acquireLock');
 
-        describe('when lock is acquired', () => {
-            it('should save the event to the repository', async () => {
-                const dto = fakeReceiveEventDto();
+            await service.processQueuedEvent(dto);
 
-                await service.processQueuedEvent(dto);
-
-                // give fire-and-forget save a tick to complete
-                await new Promise(resolve => setImmediate(resolve));
-
-                const saved = await eventRepoStub.findByEventId(dto.eventId);
-                expect(saved).not.toBeNull();
-                expect(saved?.eventId).toBe(dto.eventId);
-            });
-
-            it('should update status to PROCESSED on success', async () => {
-                const dto = fakeReceiveEventDto();
-                await eventRepoStub.save({ eventId: dto.eventId } as EventEntity);
-
-                await service.processQueuedEvent(dto);
-
-                const saved = await eventRepoStub.findByEventId(dto.eventId);
-                expect(saved?.status).toBe(EventStatusEnum.PROCESSED);
-            });
-
-            it('should log error but not throw when repo save fails', async () => {
-                const dto = fakeReceiveEventDto();
-                jest.spyOn(eventRepoStub, 'save').mockRejectedValueOnce(new Error('db error'));
-
-                await service.processQueuedEvent(dto);
-
-                await new Promise(resolve => setImmediate(resolve));
-
-                expect(loggerErrorSpy).toHaveBeenCalledWith(
-                    expect.stringContaining(dto.eventId),
-                    expect.any(Error),
-                );
-            });
+            expect(acquireSpy).not.toHaveBeenCalled();
+            expect(httpStub.post).not.toHaveBeenCalled();
         });
 
-        describe('when lock is not acquired (duplicate)', () => {
-            it('should return early without saving to repo', async () => {
-                const dto = fakeReceiveEventDto();
-                idempotencyStub.simulateDuplicate(dto.eventId, dto.shipmentId);
+        it('should skip if lock cannot be acquired (duplicate)', async () => {
+            const dto = fakeReceiveEventDto();
+            idempotencyStub.simulateDuplicate(dto.eventId, dto.shipmentId);
+            // TODO
+            const saveSpy = eventRepoStub.save(dto);
 
-                await service.processQueuedEvent(dto);
+            await service.processQueuedEvent(dto);
 
-                expect(eventRepoStub.getStore()).toHaveLength(0);
-            });
-
-            it('should return early without updating status', async () => {
-                const dto = fakeReceiveEventDto();
-                await eventRepoStub.save({ eventId: dto.eventId } as EventEntity);
-                idempotencyStub.simulateDuplicate(dto.eventId, dto.shipmentId);
-                const updateSpy = jest.spyOn(eventRepoStub, 'updateStatus');
-
-                await service.processQueuedEvent(dto);
-
-                expect(updateSpy).not.toHaveBeenCalled();
-            });
+            expect(saveSpy).not.toHaveBeenCalled();
+            expect(httpStub.post).not.toHaveBeenCalled();
         });
 
-        describe('when processing fails', () => {
-            it('should update status to FAILED', async () => {
-                const dto = fakeReceiveEventDto();
-                await eventRepoStub.save({ eventId: dto.eventId } as EventEntity);
-                (service as any).processEventByType = jest.fn()
-                    .mockRejectedValueOnce(new Error('processing failed'));
+        it('should process successfully: save event, resolve shipment, call routing, update status, release lock', async () => {
+            const dto = fakeReceiveEventDto();
+            const releaseSpy = jest.spyOn(idempotencyStub, 'releaseLock');
 
-                await expect(service.processQueuedEvent(dto)).rejects.toThrow();
+            await service.processQueuedEvent(dto);
 
-                const saved = await eventRepoStub.findByEventId(dto.eventId);
-                expect(saved?.status).toBe(EventStatusEnum.FAILED);
-            });
+            // Verify event saved
+            const savedEvent = await eventRepoStub.findByEventId(dto.eventId);
+            expect(savedEvent).toBeDefined();
+            expect(savedEvent?.status).toBe(EventStatusEnum.PROCESSED);
 
-            it('should rethrow the original error', async () => {
-                const dto = fakeReceiveEventDto();
-                await eventRepoStub.save({ eventId: dto.eventId } as EventEntity);
-                const error = new Error('unexpected failure');
-                (service as any).processEventByType = jest.fn().mockRejectedValueOnce(error);
+            // Verify shipment resolved (created as active stub since it didn't exist)
+            const savedShipment = await shipmentRepoStub.findByShipmentId(dto.shipmentId);
+            expect(savedShipment).toBeDefined();
+            expect(savedShipment?.status).toBe(ShipmentStatusEnum.ACTIVE);
 
-                await expect(service.processQueuedEvent(dto)).rejects.toThrow(error);
-            });
+            // Verify routing called
+            expect(httpStub.post).toHaveBeenCalledWith('/v1/routing-service', expect.any(Object));
 
-            it('should log the error before rethrowing', async () => {
-                const dto = fakeReceiveEventDto();
-                await eventRepoStub.save({ eventId: dto.eventId } as EventEntity);
-                (service as any).processEventByType = jest.fn()
-                    .mockRejectedValueOnce(new Error('fail'));
+            // Verify lock released
+            expect(releaseSpy).toHaveBeenCalledWith(dto.eventId, dto.shipmentId, 'stub-token');
+        });
 
-                await expect(service.processQueuedEvent(dto)).rejects.toThrow();
+        it('should fail if shipment is not ACTIVE', async () => {
+            const dto = fakeReceiveEventDto();
+            await shipmentRepoStub.save({
+                shipmentId: dto.shipmentId,
+                status: ShipmentStatusEnum.CANCELLED,
+                merchantId: dto.merchantId
+            } as any);
+            const releaseSpy = jest.spyOn(idempotencyStub, 'releaseLock');
 
-                expect(loggerErrorSpy).toHaveBeenCalledWith(
-                    expect.stringContaining(dto.eventId),
-                    expect.any(Error),
-                );
-            });
+            await service.processQueuedEvent(dto);
+
+            const savedEvent = await eventRepoStub.findByEventId(dto.eventId);
+            expect(savedEvent?.status).toBe(EventStatusEnum.FAILED);
+            expect(httpStub.post).not.toHaveBeenCalled();
+            expect(releaseSpy).toHaveBeenCalledWith(dto.eventId, dto.shipmentId, 'stub-token');
+        });
+
+        it('should update status to FAILED and rethrow if processing fails', async () => {
+            const dto = fakeReceiveEventDto();
+            httpStub.post.mockReturnValueOnce(throwError(() => new Error('routing failed')));
+            const releaseSpy = jest.spyOn(idempotencyStub, 'releaseLock');
+
+            await expect(service.processQueuedEvent(dto)).rejects.toThrow('routing failed');
+
+            const savedEvent = await eventRepoStub.findByEventId(dto.eventId);
+            expect(savedEvent?.status).toBe(EventStatusEnum.FAILED);
+            expect(releaseSpy).toHaveBeenCalledWith(dto.eventId, dto.shipmentId, 'stub-token');
         });
     });
 });

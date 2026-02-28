@@ -1,23 +1,32 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 
 @Injectable()
 export class HmacMiddleware implements NestMiddleware {
 
-    private readonly secret: string;
+    private readonly secret: string | undefined;
 
-    constructor() {
-        this.secret = process.env.WEBHOOK_SECRET || 'my-secret-key-123';
+    constructor(private readonly configService: ConfigService) {
+        this.secret = this.configService.get<string>('app.webhookSecret');
     }
 
     use(req: any, res: any, next: (error?: any) => void): any {
+        if (!this.secret) {
+            throw new Error('HMAC secret is not configured in the application config');
+        }
+
         const signature = req.headers['x-signature'] as string;
 
         if (!signature) {
             throw new UnauthorizedException('Missing signature');
         }
 
-        const payload = req.rawBody || JSON.stringify(req.body);
+        const payload = req.rawBody as Buffer;
+        if (!payload) {
+            throw new Error('Raw body is missing. Ensure NestExpressApplication is configured with rawBody: true');
+        }
+
         const hash = crypto.createHmac('sha256', this.secret).update(payload).digest('hex');
 
         if (signature.length !== hash.length) {

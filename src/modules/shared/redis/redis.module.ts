@@ -1,5 +1,5 @@
 import {Module} from "@nestjs/common";
-import {IdempotencyService} from "./services/implemetion/idempotency.service";
+import {IdempotencyService} from "./services/implementation/idempotency.service";
 import {RedisProvider} from "./providers/redis.provider";
 
 

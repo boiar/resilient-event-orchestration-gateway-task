@@ -1,17 +1,35 @@
-import { Controller, Logger } from '@nestjs/common';
-import { MessagePattern, Payload, EventPattern } from '@nestjs/microservices';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
+import { Logger } from '@nestjs/common';
 import { ReceiveEventDto } from '../dtos/receive-event.dto';
-import { EventsGatewayService } from '../services/implemention/events-gateway.service';
+import { EventsGatewayService } from '../services/implementation/events-gateway.service';
 
-@Controller()
-export class EventsProcessor {
+@Processor('events-processing', { concurrency: 20 })
+export class EventsProcessor extends WorkerHost {
     private readonly logger = new Logger(EventsProcessor.name);
 
-    constructor(private readonly eventsGatewayService: EventsGatewayService) {}
+    constructor(private readonly eventsGatewayService: EventsGatewayService) {
+        super();
+    }
 
-    @EventPattern('process-event')
-    async handleEvent(@Payload() dto: ReceiveEventDto): Promise<void> {
-        this.logger.log(`Processing event: ${dto.eventId}`);
-        await this.eventsGatewayService.processQueuedEvent(dto);
+    async process(job: Job<ReceiveEventDto, any, string>): Promise<void> {
+        const { name, data: dto } = job;
+
+        if (name === 'process-event') {
+            this.logger.log(`Processing event: ${dto.eventId}`);
+            await this.eventsGatewayService.processQueuedEvent(dto);
+        }
+    }
+
+    @OnWorkerEvent('failed')
+    async onJobFailed(job: Job<ReceiveEventDto>, error: Error) {
+        if (job.attemptsMade >= (job.opts.attempts || 1)) {
+            const dto = job.data;
+            this.logger.error(
+                `Dead letter received - ${job.attemptsMade} attempts: ${dto.eventId} | type: ${dto.type} | shipmentId: ${dto.shipmentId} | error: ${error.message}`,
+            );
+
+            // send alert (ex ->email)
+        }
     }
 }

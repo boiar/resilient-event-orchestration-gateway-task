@@ -22,6 +22,7 @@ const payload = (id: number) => JSON.stringify({
 const sign = (body: string) => crypto.createHmac('sha256', config.secret).update(body).digest('hex');
 
 async function run() {
+    // requests concurrent
     const results = await Promise.all(
         Array.from({ length: config.total }, (_, i) => {
             const body = payload(i);

@@ -11,12 +11,12 @@
 ---
 
 
-## Prompt 1 — Project Overview Document
+## Prompt 1 — Project README Document
 
-**Goal:** Create a detailed markdown overview document for the project.
+**Goal:** Create a detailed markdown README document for the project.
 
 ```
-Create a detailed OVERVIEW.md file for the project that covers:
+Create a detailed README.md file for the project that covers:
 - What we are building and why
 - System components explained
 - Technologies table with versions and purpose
@@ -32,7 +32,7 @@ Create a detailed OVERVIEW.md file for the project that covers:
 ```
 
 **What Claude produced:**
-- Complete `OVERVIEW.md` with all sections requested
+- Complete `README.md` with all sections requested
 - ASCII flow diagram for event lifecycle
 - Two-layer idempotency explanation (Redis SET NX + MongoDB conditional update)
 - DLQ ops playbook table (Monitor → Alert → Inspect → Replay → Purge)
@@ -48,9 +48,9 @@ Create a detailed OVERVIEW.md file for the project that covers:
 ```
 Create a docker-compose.yml that spins up 4 services with a single command:
 - NestJS app on port 3000 with health check
-- RabbitMQ 3.12 with management UI on 15672
-- Redis 7 with persistence, password, maxmemory 256mb, allkeys-lru policy
+- Redis 7 with persistence, password, maxmemory 256mb, allkeys-lru policy (for BullMQ)
 - MongoDB 7 with init script
+- Mongo-Express for database visualization
 
 All services should:
 - Have health checks with proper intervals
@@ -59,18 +59,16 @@ All services should:
 - Have restart: unless-stopped
 
 Also create:
-- infra/rabbitmq/rabbitmq.conf (loads definitions on startup)
-- infra/rabbitmq/definitions.json (pre-declares exchanges, queues, DLX bindings)
 - infra/mongodb/init.js (creates collections, indexes, seed data)
 - .env.example with all required variables
 ```
 
 **What Claude produced:**
 - `docker-compose.yml` with all 4 services, health checks, volumes, network
-- `definitions.json` pre-declaring `events.direct`, `events.dlx`, `events.processing`, `events.dlq`
-- `rabbitmq.conf` pointing to definitions file
-- MongoDB init script with collection creation, indexes, and 3 seed shipments
-- `.env.example` with all environment variables documented
+- BullMQ configuration for reliable asynchronous job processing
+- MongoDB init script with collection creation, indexes, and seed shipment data
+- `.env.example` with all environment variables documented for Redis and MongoDB
+
 
 ---
 
@@ -98,8 +96,19 @@ It should:
 
 ---
 
+## Prompt 4 — Reliability & Retry Refinement
 
+**Goal:** Resolve conflict between Idempotency Lock and BullMQ Retry mechanism.
 
+**What Antigravity performed:**
+- Identified a critical logic issue where the Redis idempotency lock (TTL 60s) prevented BullMQ's exponential backoff retries (e.g., 1s, 2s, 4s) from executing, as the lock was intentionally NOT released on failure.
+- Modified `EventsGatewayService.processQueuedEvent` to:
+    1. Add a secondary idempotency check against the MongoDB `PROCESSED` status.
+    2. Explicitly **release the lock** in the `catch` block, enabling BullMQ retries to successfully re-acquire the lock and re-attempt the task.
+- Fixed directory structure misspellings ("implemention" → "implementation") and updated global imports.
+- Updated the `README.md` lifecycle documentation to accurately describe the new "Release on Failure" strategy.
+
+---
 
 > **Note:** All AI-generated code was reviewed, understood, and validated
 > before inclusion in the project.

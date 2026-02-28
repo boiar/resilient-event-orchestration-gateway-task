@@ -1,19 +1,19 @@
-import {IIdempotencyService} from "../../../services/idempotency-service.interface";
+import { IIdempotencyService } from "../../../services/idempotency-service.interface";
 
 export class IdempotencyServiceStub implements IIdempotencyService {
     private lockedKeys = new Set<string>();
     private releasedKeys: string[] = [];
 
-    async acquireLock(eventId: string, shipmentId: string): Promise<boolean> {
+    async acquireLock(eventId: string, shipmentId: string): Promise<string | null> {
         const key = `event:lock:${eventId}:${shipmentId}`;
         if (this.lockedKeys.has(key)) {
-            return false;
+            return null;
         }
         this.lockedKeys.add(key);
-        return true;
+        return 'stub-token';
     }
 
-    async releaseLock(eventId: string, shipmentId: string): Promise<void> {
+    async releaseLock(eventId: string, shipmentId: string, token: string): Promise<void> {
         const keyPrefix = `event:lock:${eventId}:${shipmentId}`;
         this.lockedKeys.forEach(key => {
             if (key.startsWith(keyPrefix)) this.lockedKeys.delete(key);

@@ -6,13 +6,16 @@ import redisConfig from "./config/redis.config";
 import mongoConfig from "./config/mongo.config";
 import queueConfig from "./config/queue.config";
 import { MongooseModule } from "@nestjs/mongoose";
+import { RoutingServiceModule } from "./modules/routing-service/routing-service.module";
+
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, redisConfig, mongoConfig, queueConfig],
-      cache: true, 
+      cache: true,
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -31,7 +34,19 @@ import { MongooseModule } from "@nestjs/mongoose";
         autoIndex: config.get('app.nodeEnv') !== 'production', // Auto-index only in dev
       }),
     }),
-    EventsGatewayModule
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('redis.host'),
+          port: config.get<number>('redis.port'),
+          password: config.get<string>('redis.password'),
+        },
+      }),
+    }),
+    EventsGatewayModule,
+    RoutingServiceModule
 
   ],
   controllers: [],
