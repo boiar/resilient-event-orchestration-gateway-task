@@ -173,12 +173,12 @@ Api-docs(Swagger): `http://localhost:3000/api-docs`
 npm run test:unit
 ```
 
-### Integration test < 150ms time response
+### Integration test 
 ```bash
 docker exec -it fincart_app npm run test:int
 ```
 
-### Controller test < 150ms time response
+### test event gateway <150ms time response (performance)
 ```bash
 docker exec -it fincart_app npm run test:perf
 ```

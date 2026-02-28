@@ -101,14 +101,13 @@ export class EventsGatewayService implements IEventsGatewayService {
                 }
             }
 
-            throw error; // re-throw so BullMQ knows to schedule a retry
-
-        } finally {
             // release lock on failure so BullMQ retries
             // on success, let the lock expire naturally (DB PROCESSED check is the durable guard)
             if (lockToken && !processingSucceeded) {
                 await this.idempotency.releaseLock(dto.eventId, dto.shipmentId, lockToken);
             }
+
+            throw error; // re-throw so BullMQ knows to schedule a retry
         }
     }
 

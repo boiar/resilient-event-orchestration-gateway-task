@@ -9,6 +9,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { RoutingServiceModule } from "./modules/routing-service/routing-service.module";
 
 import { BullModule } from '@nestjs/bullmq';
+import {AppController} from "./app.controller";
 
 @Module({
   imports: [
@@ -49,7 +50,7 @@ import { BullModule } from '@nestjs/bullmq';
     RoutingServiceModule
 
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: []
 })
 export class AppModule { }

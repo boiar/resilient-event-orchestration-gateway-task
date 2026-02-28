@@ -37,23 +37,7 @@ describe('EventsGatewayController (Integration)', () => {
         // get HttpService from Nest
         httpService = app.get<HttpService>(HttpService);
 
-        // mock routing-service to avoid network delays
-        jest.spyOn(httpService, 'post').mockImplementation(() => {
-            const mockResponse: AxiosResponse = {
-                data: {
-                    routed: true,
-                    routeId: 'route_mocked',
-                    processedAt: new Date().toISOString(),
-                },
-                status: 200,
-                statusText: 'OK',
-                headers: {},
-                config: {
-                    headers: {} as any,
-                } as any,
-            };
-            return of(mockResponse);
-        });
+
 
 
     }, 30_000); // allow 30s for full app boot inside Docker
