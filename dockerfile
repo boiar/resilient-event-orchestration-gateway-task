@@ -7,6 +7,7 @@ WORKDIR /app
 
 # Copy package files first (better layer caching)
 COPY package*.json ./
+COPY node_modules ./node_modules
 
 # Install all dependencies
 RUN npm install

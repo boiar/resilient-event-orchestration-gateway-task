@@ -16,7 +16,13 @@ export class IdempotencyService implements IIdempotencyService {
         const key = `event:lock:${eventId}:${shipmentId}`;
         const token = crypto.randomUUID();
 
-        const result = await this.redis.set(key, token, 'EX', 60, 'NX');
+        const result = await this.redis.set(
+            key,
+            token,
+            'EX',
+            60,
+            'NX'
+        );
         return result === 'OK' ? token : null;
     }
 

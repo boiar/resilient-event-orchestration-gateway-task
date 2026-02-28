@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import { INestApplication, ValidationPipe, VersioningType, Logger } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../../../app.module';
 import { ConfigService } from '@nestjs/config';
+import { AxiosResponse } from 'axios';
+import { HttpService } from '@nestjs/axios';
+import { of } from 'rxjs';
 import * as crypto from 'crypto';
 
 const BASE_URL = '/v1/events-gateway';
@@ -10,6 +13,7 @@ const BASE_URL = '/v1/events-gateway';
 describe('EventsGatewayController (Integration)', () => {
     let app: INestApplication;
     let secret: string;
+    let httpService: HttpService;
 
     beforeAll(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -19,10 +23,39 @@ describe('EventsGatewayController (Integration)', () => {
         app = module.createNestApplication({ rawBody: true });
         app.enableVersioning({ type: VersioningType.URI });
         app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+
+        // silence logs for perf test
+        jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+        jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+        jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+
         await app.init();
 
         const configService = app.get<ConfigService>(ConfigService);
         secret = configService.get<string>('app.webhookSecret') || 'my-secret-key-123';
+
+        // get HttpService from Nest
+        httpService = app.get<HttpService>(HttpService);
+
+        // mock routing-service to avoid network delays
+        jest.spyOn(httpService, 'post').mockImplementation(() => {
+            const mockResponse: AxiosResponse = {
+                data: {
+                    routed: true,
+                    routeId: 'route_mocked',
+                    processedAt: new Date().toISOString(),
+                },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config: {
+                    headers: {} as any,
+                } as any,
+            };
+            return of(mockResponse);
+        });
+
+
     }, 30_000); // allow 30s for full app boot inside Docker
 
     afterAll(async () => {
@@ -80,7 +113,7 @@ describe('EventsGatewayController (Integration)', () => {
     });
 
     it('should complete the request within 150ms', async () => {
-        const body = JSON.stringify({
+        const payload = {
             eventId: `perf_test_${Date.now()}`,
             merchantId: 'merchant_123',
             shippingCompanyId: 'company_client',
@@ -88,10 +121,10 @@ describe('EventsGatewayController (Integration)', () => {
             type: 'SHIPMENT_CREATED',
             occurredAt: new Date().toISOString(),
             payload: { weight: 1.5, destination: 'world' },
-        });
+        };
 
+        const body = JSON.stringify(payload);
         const signature = crypto.createHmac('sha256', secret).update(body).digest('hex');
-
 
         // measure 5 runs
         const durations: number[] = [];

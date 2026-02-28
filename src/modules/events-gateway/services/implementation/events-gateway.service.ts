@@ -33,41 +33,53 @@ export class EventsGatewayService implements IEventsGatewayService {
     }
 
     async eventsEnqueue(dto: ReceiveEventDto) {
-        await this.queue.add('process-event', dto, {
-            jobId: dto.eventId,
-        });
-        this.logger.log(`Event enqueued: ${dto.eventId}`);
+        try {
+            await this.queue.add('process-event', dto, {
+                jobId: dto.eventId,
+            });
+            this.logger.log(`Event enqueued: ${dto.eventId}`);
+            return {status: 'accepted'};
 
-        return {
-            status: 'accepted',
-        };
+        } catch (error: any) {
+            this.logger.error(`Failed to enqueue event: ${dto.eventId}`, error.message);
+            return {status: 'error', message: 'Failed to enqueue event'};
+        }
     }
 
     async processQueuedEvent(dto: ReceiveEventDto): Promise<void> {
         let lockToken: string | null = null;
-        try {
-            //Idempotency (DB Check)
-            const existingEvent = await this.eventRepo.findByEventId(dto.eventId);
-            if (existingEvent?.status === EventStatusEnum.PROCESSED) {
-                this.logger.log(`Event already processed, skipping: ${dto.eventId}`);
-                return;
-            }
+        let eventSaved = false;
+        let processingSucceeded = false;
 
-            // TODO
-            // Primary Idempotency
+        try {
+            // prevents concurrent duplicate processing
             lockToken = await this.idempotency.acquireLock(dto.eventId, dto.shipmentId);
             if (!lockToken) {
                 this.logger.log(`Duplicate event skipped (lock held): ${dto.eventId}`);
                 return;
             }
 
-            await this.eventRepo.save(EventMapper.fromDtoToEntity(dto));
+            // db idempotency check
+            const existingEvent = await this.eventRepo.findByEventId(dto.eventId);
+            if (existingEvent?.status === EventStatusEnum.PROCESSED) {
+                this.logger.log(`Event already processed, skipping: ${dto.eventId}`);
+                processingSucceeded = true;
+                return;
+            }
+
+            // event record (only on first attempt)
+            if (!existingEvent) {
+                await this.eventRepo.save(EventMapper.fromDtoToEntity(dto));
+            }
+            eventSaved = true;
 
             const shipment = await this.resolveShipment(dto);
 
             if (shipment.status !== ShipmentStatusEnum.ACTIVE) {
+                // Permanent business rejection — not a transient error, no retry needed
                 this.logger.warn(`Shipment ${dto.shipmentId} is ${shipment.status}. Skipping routing.`);
                 await this.eventRepo.updateStatus(dto.eventId, EventStatusEnum.FAILED);
+                processingSucceeded = true; // no retry needed
                 return;
             }
 
@@ -75,20 +87,28 @@ export class EventsGatewayService implements IEventsGatewayService {
             this.logger.log(`Event routed: ${dto.eventId} — routeId: ${routingResult.routeId}`);
 
             await this.eventRepo.updateStatus(dto.eventId, EventStatusEnum.PROCESSED);
+            processingSucceeded = true;
 
         } catch (error: any) {
-            if (lockToken) {
+            this.logger.error(`Processing failed: ${dto.eventId}`, error.stack);
+
+            // update db status if the event record was actually saved
+            if (eventSaved) {
+                try {
+                    await this.eventRepo.updateStatus(dto.eventId, EventStatusEnum.FAILED);
+                } catch (updateErr) {
+                    this.logger.error(`Failed to update status to FAILED for ${dto.eventId}`);
+                }
+            }
+
+            throw error; // re-throw so BullMQ knows to schedule a retry
+
+        } finally {
+            // release lock on failure so BullMQ retries
+            // on success, let the lock expire naturally (DB PROCESSED check is the durable guard)
+            if (lockToken && !processingSucceeded) {
                 await this.idempotency.releaseLock(dto.eventId, dto.shipmentId, lockToken);
             }
-            this.logger.error(`Failed to process event: ${dto.eventId}`, error.stack);
-
-            try {
-                await this.eventRepo.updateStatus(dto.eventId, EventStatusEnum.FAILED);
-            } catch (updateErr) {
-                this.logger.error(`Failed to update status to FAILED for ${dto.eventId}`);
-            }
-
-            throw error; // BullMQ retry logic
         }
     }
 

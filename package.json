@@ -21,7 +21,7 @@
     "test:unit": "./node_modules/.bin/jest --testPathPattern=unit --runInBand --verbose",
     "test:int": "./node_modules/.bin/jest --testPathPattern=integration --runInBand --verbose",
     "test:load": "npx ts-node src/modules/events-gateway/test/load/events-gateway.load-test.ts",
-    "test:perf": "./node_modules/.bin/jest --testPathPattern=integration --runInBand --verbose --silent=false -t 'should complete the request within 150ms'",
+    "test:perf": "./node_modules/.bin/jest --testPathPattern=integration --runInBand --verbose --silent=false -t 'should complete the request within 150ms' --forceExit",
     "test:all": "jest"
   },
   "dependencies": {
@@ -31,12 +31,12 @@
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^10.0.0",
     "@nestjs/microservices": "^10.4.22",
-    "@nestjs/mongoose": "^11.0.4",
+    "@nestjs/mongoose": "^10.0.10",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^8.1.0",
-    "@nestjs/typeorm": "^11.0.0",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
+    "axios": "^1.13.6",
     "bullmq": "^5.70.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
@@ -49,7 +49,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.3",
     "@nestjs/cli": "^10.0.0",
-    "@nestjs/schematics": "^11.0.9",
+    "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",

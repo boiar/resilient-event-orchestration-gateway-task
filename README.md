@@ -175,11 +175,6 @@ Api-docs(Swagger): `http://localhost:3000/api-docs`
 npm run test:unit
 ```
 
-#### Controller test < 150ms time response
-```bash
-docker exec -it fincart_app npm run test:int
-```
-
 #### Integration test < 150ms time response
 ```bash
 docker exec -it fincart_app npm run test:int
@@ -190,15 +185,15 @@ docker exec -it fincart_app npm run test:int
 docker exec -it fincart_app npm run test:perf
 ```
 
-**Request duration: 63.73ms**
+**Request Avg: 33ms**
 ![Load test results](performance_images/enpoint-performance-1.png)
 
-**Request duration: 97.34ms**
+**Request Avg: 42ms**
 ![Load test results](performance_images/enpoint-performance-2.png)
 
 #### Load Test — 100 Concurrent Requests
 ```bash
-npx ts-node src/modules/events-gateway/test/load/events-gateway.load-test.ts
+docker exec -it fincart_app npm run test:load
 ```
 
 ![Load test results](performance_images/load-test.png)

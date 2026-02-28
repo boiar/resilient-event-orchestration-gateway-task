@@ -27,6 +27,11 @@ export class IdempotencyServiceStub implements IIdempotencyService {
         this.lockedKeys.add(key);
     }
 
+    simulateExpiry(eventId: string, shipmentId: string): void {
+        const key = `event:lock:${eventId}:${shipmentId}`;
+        this.lockedKeys.delete(key);
+    }
+
     isLocked(eventId: string, shipmentId: string): boolean {
         const key = `event:lock:${eventId}:${shipmentId}`;
         return this.lockedKeys.has(key);

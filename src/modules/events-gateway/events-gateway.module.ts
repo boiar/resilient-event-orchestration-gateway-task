@@ -19,13 +19,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         BullModule.registerQueue({
             name: 'events-processing',
             defaultJobOptions: {
-                attempts: 3,
+                attempts: 3,  // retry 3 times
                 backoff: {
                     type: 'exponential',
-                    delay: 1000,
+                    delay: 1000, // 1s -> 2s -> 4s
                 },
-                removeOnComplete: true,
-                removeOnFail: false,
+                removeOnComplete: true, // clean up successful jobs
+                removeOnFail: false, // keep failed jobs for inspection
             },
         }),
         MongooseModule.forFeature([

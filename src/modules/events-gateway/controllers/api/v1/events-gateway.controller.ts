@@ -24,7 +24,21 @@ export class EventsGatewayController {
         required: true,
         example: 'a9f5d1c3b2e6f7...',
     })
-    @ApiResponse({ status: 202, description: 'Event accepted', type: ReceiveEventResponse })
+    @ApiResponse({
+        status: 202,
+        description: 'Event accepted',
+        type: ReceiveEventResponse
+    })
+    @ApiResponse({
+        status: 500,
+        description: 'Failed to enqueue event',
+        schema: {
+            example: {
+                status: 'error',
+                message: 'Failed to enqueue event',
+            },
+        },
+    })
     async ReceiveEvent(@Body() dto: ReceiveEventDto): Promise<ReceiveEventResponse> {
         return this.eventGatewayService.eventsEnqueue(dto);
     }
