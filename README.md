@@ -96,54 +96,52 @@ POST /v1/events-gateway
    eventsEnqueue(dto)
         |-- queue.add(jobId = eventId)
         |
-   return { status: 'accepted' }       <-- success code to producer
-        | 
-          
+   return { status: 'accepted' }       <-- 202 Accepted returned to producer
+
 ───────────────────────────
-     Background Worker               
+     Background Worker
 ───────────────────────────
 
    processQueuedEvent()
         |
-   idempotency.acquireLock
+   idempotency.acquireLock()
         |
-   eventRepo.save()                        
+   eventRepo.save()
         |
-   resolveShipment()                            
+   resolveShipment()
         |
    check shipment.status === ACTIVE
         |
-   callRoutingService()                         
+   callRoutingService()
         |
-   eventRepo.updateStatus()
+   eventRepo.updateStatus(PROCESSED)
         |
-   idempotency.releaseLock(lockToken)  
+   lock expires naturally               <-- no explicit release on success
+                                            DB PROCESSED check is the durable guard
 
 ───────────────────────────
-     On Failure                
+     On Failure
 ───────────────────────────
 
    catch(error)
         |
-   GlobalExceptionFilter logs full stack trace
+   logger.error(full stack trace)
         |
-   eventRepo.updateStatus()
+   eventRepo.updateStatus(FAILED)
         |
-   idempotency.releaseLock(lockToken)
+   idempotency.releaseLock(lockToken)  <-- released so BullMQ retry can re-acquire
         |
-   throw error                         <-- BullMQ exponential backoff retry
-```        |
-   BullMQ retries with exponential backoff
-        |   attempt 1 -> wait 1s -> re-acquire lock -> try again
-        |   attempt 2 -> wait 2s -> re-acquire lock -> try again
-        |   attempt 3 -> wait 4s -> re-acquire lock -> try again
+   throw error                         <-- BullMQ schedules exponential backoff retry
         |
-   max retries exhausted --> Dead Letter Queue listener
-
+   attempt 1 -> wait 1s -> re-acquire lock -> try again
+   attempt 2 -> wait 2s -> re-acquire lock -> try again
+   attempt 3 -> wait 4s -> re-acquire lock -> try again
+        |
+   max retries exhausted --> Dead Letter Queue
         |
    EventsDlqProcessor logs permanently failed event
-
 ```
+
 ---
 ## Dead Letter Queue Strategy
 Failed events that exhaust all retry attempts are routed to the `events:dlq` Redis list.
@@ -168,19 +166,19 @@ App runs on `http://localhost:3000`
 Api-docs(Swagger): `http://localhost:3000/api-docs` 
 
 ---
-### Testing
+## Testing
 
 ### unit tests
 ``` bash
 npm run test:unit
 ```
 
-#### Integration test < 150ms time response
+### Integration test < 150ms time response
 ```bash
 docker exec -it fincart_app npm run test:int
 ```
 
-#### Controller test < 150ms time response
+### Controller test < 150ms time response
 ```bash
 docker exec -it fincart_app npm run test:perf
 ```
@@ -191,7 +189,7 @@ docker exec -it fincart_app npm run test:perf
 **Request Avg: 42ms**
 ![Load test results](performance_images/enpoint-performance-2.png)
 
-#### Load Test — 100 Concurrent Requests
+### Load Test — 100 Concurrent Requests
 ```bash
 docker exec -it fincart_app npm run test:load
 ```
