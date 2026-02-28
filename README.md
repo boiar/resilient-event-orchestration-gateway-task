@@ -17,6 +17,73 @@ A **high-concurrency asynchronous event gateway** built with NestJS, designed to
 | **Jest**             | Testing                                                   |
 
 ---
+## Quick Start
+```bash
+docker-compose up --build
+```
+App runs on `http://localhost:3000`
+Api-docs(Swagger): `http://localhost:3000/api-docs`
+---
+## Environment Variables
+
+Create a `.env` file in the project root:
+```env
+# App
+PORT=3000
+NODE_ENV=development
+WEBHOOK_SECRET=my-secret-key-123
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# MongoDB
+MONGO_URI=mongodb://mongo:27017/fincart
+
+# Queue
+QUEUE_NAME=events
+QUEUE_CONCURRENCY=10
+QUEUE_ATTEMPTS=3
+QUEUE_BACKOFF_DELAY=1000
+```
+
+> `REDIS_HOST` and `MONGO_URI` use Docker service names. When running tests on your host machine, replace with `localhost`.
+
+
+---
+## Project Structure
+```
+src/
+├── app.module.ts
+├── app.controller.ts           # Health & root endpoints
+├── main.ts
+├── config/
+│   ├── app.config.ts
+│   ├── redis.config.ts
+│   ├── mongo.config.ts
+│   └── queue.config.ts
+└── modules/
+    ├── events-gateway/
+    │   ├── controllers/
+    │   ├── services/
+    │   ├── processors/         # BullMQ worker
+    │   ├── repositories/
+    │   ├── dto/
+    │   ├── entities/
+    │   ├── middleware/         # HMAC signature validation
+    │   └── tests/
+    │       ├── unit/
+    │       ├── integration/
+    │       └── load/
+    ├── routing-service/        # Stub — simulates 2s external API delay
+    └── shared/
+        ├── filters/            # GlobalExceptionFilter
+        └── redis/              # Redis provider & idempotency service
+```
+
+---
+
 
 ## Key Features & Architecture
 
@@ -157,15 +224,9 @@ from `PENDING` to `PROCESSED` or `FAILED` asynchronously. Consumers of event sta
 the synchronous response. Idempotency guarantees that even if the same event is
 delivered multiple times, the final state in MongoDB converges to a single outcome.
 
----
-## Quick Start
-```bash
-docker-compose up --build
-```
-App runs on `http://localhost:3000`
-Api-docs(Swagger): `http://localhost:3000/api-docs` 
 
----
+
+
 ## Testing
 
 ### unit tests
