@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { GlobalExceptionFilter } from "./modules/shared/filters/global-exception.filter";
+import {DocumentBuilder, SwaggerModule} from "@nestjs/swagger";
 
 async function bootstrap() {
     // Specify NestExpressApplication to get rawBody support
@@ -24,6 +25,23 @@ async function bootstrap() {
         transform: false,
         disableErrorMessages: true,
     }));
+
+    const config = new DocumentBuilder()
+        .setTitle('Resilient Event Orchestration Gateway')
+        .setDescription('High-concurrency async event gateway with idempotency')
+        .setVersion('1.0')
+        .addApiKey(
+            { type: 'apiKey', name: 'x-hmac-signature', in: 'header' },
+            'hmac-signature'
+        )
+        .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document, {
+        swaggerOptions: {
+            persistAuthorization: true,
+        },
+    });
 
     app.useGlobalFilters(new GlobalExceptionFilter());
     app.enableShutdownHooks();
