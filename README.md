@@ -26,7 +26,11 @@ Api-docs(Swagger): `http://localhost:3000/api-docs`
 ---
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Copy from `.env.example` and adjust as needed:
+```bash
+cp .env.example .env
+```
+
 ```env
 # App
 PORT=3000
