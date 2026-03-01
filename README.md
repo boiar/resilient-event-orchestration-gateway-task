@@ -41,7 +41,9 @@ cp .env.example .env
 # App
 PORT=3000
 NODE_ENV=development
-WEBHOOK_SECRET="my-secret-key-123"   // for hmac signature at swagger -> for test use hashed key (7f2ba217a561ad4b51c3f1e432c701eedbdcdc8b8c8538c6f4d65077395d9e25) 
+
+# Note -> fixed hmac signature for testing
+WEBHOOK_SECRET="my-secret-key-123"   # for hmac signature at swagger -> for test use hashed key (7f2ba217a561ad4b51c3f1e432c701eedbdcdc8b8c8538c6f4d65077395d9e25) 
 
 # Redis
 REDIS_HOST=redis
@@ -63,6 +65,7 @@ ROUTING_SERVICE_URL=http://127.0.0.1:3000/v1/routing-service
 
 
 > For use Mongo Express use username :`admin` and password :`admin`
+> For use redis-commander visit `http://127.0.0.1:8882/`
 > For use redis-commander visit `http://127.0.0.1:8882/`
 
 ---
