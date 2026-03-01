@@ -19,7 +19,12 @@ A **high-concurrency asynchronous event gateway** built with NestJS, designed to
 ---
 ## Quick Start
 ```bash
-docker-compose up --build
+1. docker-compose up --build
+
+2. docker exec -it fincart_app npm run build
+
+3. docker exec -it fincart_app npm run start:dev
+
 ```
 App runs on `http://localhost:3000`
 Api-docs(Swagger): `http://localhost:3000/api-docs`
@@ -31,29 +36,34 @@ Copy from `.env.example` and adjust as needed:
 cp .env.example .env
 ```
 
+
 ```env
 # App
 PORT=3000
 NODE_ENV=development
-WEBHOOK_SECRET=my-secret-key-123
+WEBHOOK_SECRET="my-secret-key-123"   // for hmac signature at swagger -> for test use hashed key (7f2ba217a561ad4b51c3f1e432c701eedbdcdc8b8c8538c6f4d65077395d9e25) 
 
 # Redis
 REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# MongoDB
-MONGO_URI=mongodb://mongo:27017/fincart
+DOCKER_MONGO_USERNAME=fincart
+DOCKER_MONGO_PASSWORD=mongo_pass
+DOCKER_MONGO_DATABASE=fincart_events
+MONGODB_URI=mongodb://fincart:mongo_pass@mongodb:27017/fincart_events?authSource=admin
 
-# Queue
-QUEUE_NAME=events
-QUEUE_CONCURRENCY=10
-QUEUE_ATTEMPTS=3
-QUEUE_BACKOFF_DELAY=1000
+WORKER_PREFETCH=10
+WORKER_MAX_RETRIES=3
+ROUTING_SERVICE_DELAY_MS=2000
+ROUTING_SERVICE_URL=http://127.0.0.1:3000/v1/routing-service
 ```
 
 > `REDIS_HOST` and `MONGO_URI` use Docker service names. When running tests on your host machine, replace with `localhost`.
 
+
+> For use Mongo Express use username :`admin` and password :`admin`
+> For use redis-commander visit `http://127.0.0.1:8882/`
 
 ---
 ## Project Structure

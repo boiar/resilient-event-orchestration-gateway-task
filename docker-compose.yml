@@ -8,22 +8,14 @@ services:
       dockerfile: dockerfile
     container_name: fincart_app
     restart: unless-stopped
+    tty: true
     ports:
       - '3000:3000'
     volumes:
       - .:/app
       - /app/node_modules
 
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=redis_pass
-      - MONGODB_URI=mongodb://fincart:mongo_pass@mongodb:27017/fincart_events?authSource=admin
-      - WEBHOOK_SECRET=my-secret-key-123
-
-    command: npm run start:prod
+    #    command: npm run build && npm run start:prod
     depends_on:
       redis:
         condition: service_healthy
@@ -63,6 +55,21 @@ services:
       retries: 5
       start_period: 10s
 
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_COMMANDER_KEYS_LIMIT: 1000
+      REDIS_COMMANDER_STREAM_MAX_LENGTH: 1000
+    ports:
+      - "8882:8081"
+    networks:
+      - fincart_network
+    depends_on:
+      - redis
+    volumes:
+      - commander_data:/data
 
   # mongo
   mongodb:
@@ -72,9 +79,9 @@ services:
     ports:
       - '27017:27017'
     environment:
-      MONGO_INITDB_ROOT_USERNAME: fincart
-      MONGO_INITDB_ROOT_PASSWORD: mongo_pass
-      MONGO_INITDB_DATABASE: fincart_events
+      MONGO_INITDB_ROOT_USERNAME: ${DOCKER_MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${DOCKER_MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${DOCKER_MONGO_DATABASE}
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -93,8 +100,8 @@ services:
     ports:
       - '8082:8081'
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: fincart
-      ME_CONFIG_MONGODB_ADMINPASSWORD: mongo_pass
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${DOCKER_MONGO_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${DOCKER_MONGO_PASSWORD}
       ME_CONFIG_MONGODB_SERVER: mongodb
       ME_CONFIG_MONGODB_PORT: 27017
       ME_CONFIG_BASICAUTH_USERNAME: admin
@@ -109,6 +116,8 @@ volumes:
   redis_data:
     driver: local
   mongodb_data:
+    driver: local
+  commander_data:
     driver: local
 
 networks:
